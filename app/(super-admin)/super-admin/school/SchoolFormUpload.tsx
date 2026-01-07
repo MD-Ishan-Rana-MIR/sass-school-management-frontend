@@ -32,7 +32,7 @@ export default function SchoolFormUpload() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-4 bg-white rounded-2xl mx-auto">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 w-full p-4 bg-white rounded-2xl mx-auto">
       {/* School Name */}
       <div className="flex flex-col space-y-4 ">
         <Label htmlFor="schoolName">School Name</Label>
