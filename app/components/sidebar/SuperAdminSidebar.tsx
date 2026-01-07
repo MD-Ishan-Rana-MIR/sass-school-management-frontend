@@ -2,115 +2,156 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, LayoutDashboard, Users, Settings, X } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  ChevronDown,
+  LayoutDashboard,
+  Users,
+  Settings,
+  X,
+  School,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 
 interface SidebarProps {
-    collapsed?: boolean;
-    mobileOpen?: boolean;
-    onCloseMobile?: () => void;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
-export default function SuperAdminSidebar({ mobileOpen = false, onCloseMobile }: SidebarProps) {
-    const [openMenu, setOpenMenu] = useState<string | null>(null);
+export default function SuperAdminSidebar({
+  mobileOpen = false,
+  onCloseMobile,
+}: SidebarProps) {
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const pathname = usePathname();
 
-    const pathName = usePathname();
+  const menuItems = [
+    {
+      label: "Dashboard",
+      icon: <LayoutDashboard className="w-4 h-4" />,
+      link: "/super-admin",
+    },
+    {
+      label: "Admin",
+      icon: <Users className="w-4 h-4" />,
+      submenu: [{ label: "All Admin", link: "/super-admin/admin" }],
+    },
+    {
+      label: "School",
+      icon: <School className="w-4 h-4" />,
+      submenu: [{ label: "All School", link: "/super-admin/school" }],
+    },
+    {
+      label: "Settings",
+      icon: <Settings className="w-4 h-4" />,
+      link: "/super-admin/settings",
+    },
+  ];
 
-    console.log(pathName)
+  return (
+    <>
+      {/* ✅ Mobile Overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          onClick={onCloseMobile}
+        />
+      )}
 
-    const menuItems = [
-        { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, link: "/super-admin", submenu: null },
-        {
-            label: "Admin",
-            icon: <Users className="w-4 h-4" />,
-            link: null,
-            submenu: [
-                { label: "All Admin", link: "/super-admin/admin" },
-                // { label: "Add User", link: "/super-admin/users/add" },
-            ],
-        },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, link: "/super-admin/settings", submenu: null },
-    ];
+      {/* ✅ Sidebar */}
+      <aside
+        className={`
+          z-50 bg-background border-r flex flex-col
+          w-[300px] h-full
+          transition-transform duration-300
 
-    return (
-        <>
-            {/* Mobile overlay */}
-            <div
-                className={`fixed inset-0 bg-black/40 z-40 transition-opacity lg:hidden ${mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-                    }`}
-                onClick={onCloseMobile}
-            />
-
-            {/* Sidebar */}
-            <aside
-                className={`
-          fixed top-0 left-0 z-50 h-full flex flex-col bg-background border-r transition-all duration-300
-          w-64
+          fixed inset-y-0 left-0
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0
+
+          lg:static lg:translate-x-0
         `}
-            >
-                {/* Header */}
-                <div className="h-16 flex items-center justify-between px-4 border-b font-semibold">
-                    <span>Super Admin</span>
+      >
+        {/* Header */}
+        <div className="h-16 flex items-center justify-between px-4 border-b font-semibold">
+          <span>Super Admin</span>
 
-                    {/* Mobile Close */}
-                    <Button size="icon" variant="ghost" className="lg:hidden" onClick={onCloseMobile}>
-                        <X className="w-5 h-5" />
-                    </Button>
-                </div>
+          {/* Mobile close */}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="lg:hidden"
+            onClick={onCloseMobile}
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
 
-                {/* Menu */}
-                <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-                    {menuItems.map((item) =>
-                        item.submenu ? (
-                            <Collapsible
-                                key={item.label}
-                                open={openMenu === item.label}
-                                onOpenChange={(isOpen) => setOpenMenu(isOpen ? item.label : null)}
-                            >
-                                <CollapsibleTrigger asChild>
-                                    <Button variant="ghost" className="w-full justify-between">
-                                        <div className="flex items-center justify-between w-full">
-                                            <span className="flex items-center gap-2">
-                                                {item.icon}
-                                                {item.label}
-                                            </span>
-                                            <ChevronDown
-                                                className={`w-4 h-4 transition-transform duration-300 ${openMenu === item.label ? "rotate-180" : ""
-                                                    }`}
-                                            />
-                                        </div>
-                                    </Button>
-                                </CollapsibleTrigger>
+        {/* Menu */}
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+          {menuItems.map((item) =>
+            item.submenu ? (
+              <Collapsible
+                key={item.label}
+                open={openMenu === item.label}
+                onOpenChange={(v) =>
+                  setOpenMenu(v ? item.label : null)
+                }
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      {item.icon}
+                      {item.label}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform ${
+                        openMenu === item.label ? "rotate-180" : ""
+                      }`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
 
-                                <CollapsibleContent className="overflow-hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
-                                    <div className="ml-6 mt-2 space-y-1">
-                                        {item.submenu.map((sub) => (
-                                            <Link key={sub.label} href={sub.link || "#"} passHref>
-                                                <Button asChild variant="ghost" className="w-full justify-start">
-                                                    <span>{sub.label}</span>
-                                                </Button>
-                                            </Link>
-                                        ))}
-                                    </div>
-                                </CollapsibleContent>
-                            </Collapsible>
-                        ) : (
-                            <Link key={item.label} href={item.link || "#"} passHref>
-                                <Button asChild variant="ghost" className="w-full justify-start gap-2">
-                                    <div className="flex items-center gap-2">
-                                        {item.icon}
-                                        <span>{item.label}</span>
-                                    </div>
-                                </Button>
-                            </Link>
-                        )
-                    )}
-                </nav>
-            </aside>
-        </>
-    );
+                <CollapsibleContent>
+                  <div className="ml-6 mt-2 space-y-1">
+                    {item.submenu.map((sub) => (
+                      <Link key={sub.label} href={sub.link}>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                        >
+                          {sub.label}
+                        </Button>
+                      </Link>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ) : (
+              <Link key={item.label} href={item.link!}>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start gap-2 ${
+                    pathname === item.link
+                      ? "bg-muted font-medium"
+                      : ""
+                  }`}
+                >
+                  {item.icon}
+                  {item.label}
+                </Button>
+              </Link>
+            )
+          )}
+        </nav>
+      </aside>
+    </>
+  );
 }
