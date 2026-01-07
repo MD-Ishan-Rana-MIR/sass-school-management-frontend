@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu, Bell } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 interface NavbarProps {
     collapsed?: boolean;
@@ -9,6 +10,12 @@ interface NavbarProps {
 }
 
 export default function SuperAdminNavbar({ collapsed, onToggleCollapse, onMobileOpen }: NavbarProps) {
+
+    const pathName = usePathname();
+
+    console.log(pathName)
+
+
     return (
         <header className="flex items-center justify-between h-16 px-4 lg:px-6 border-b bg-background transition-all duration-300">
             <div className="flex items-center gap-3">

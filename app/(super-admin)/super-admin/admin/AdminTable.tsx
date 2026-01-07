@@ -67,7 +67,7 @@ export default function AdminTable() {
     };
 
     return (
-        <div className="p-6 space-y-4 bg-white rounded-2xl shadow  ">
+        <div className="p-6 space-y-4 bg-white rounded-2xl shadow overflow-x-auto  ">
             {/* Search */}
             <div className="flex justify-between items-center">
                 <Input
