@@ -19,7 +19,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import Image from "next/image";
+import { useForm, Controller } from "react-hook-form";
 import SchoolFormUpload from "./SchoolFormUpload";
+import { Label } from "@/components/ui/label";
 
 interface User {
   id: number;
@@ -43,6 +45,13 @@ const dummyData: User[] = Array.from({ length: 42 }, (_, i) => ({
   isActive: i % 2 === 0,
 }));
 
+type FormValues = {
+  schoolName: string;
+  schoolEmail: string;
+  contactNumber: string;
+  schoolLogo: FileList | null;
+};
+
 export default function SchoolTable() {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,6 +60,10 @@ export default function SchoolTable() {
   const [openDelete, setOpenDelete] = useState(false);
   const [openAdminModal, setOpenAdminModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  // React Hook Form for Update
+  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<FormValues>();
 
   // Filtered data
   const filteredData = useMemo(
@@ -73,12 +86,31 @@ export default function SchoolTable() {
 
   const handleUpdate = (user: User) => {
     setSelectedUser(user);
+    reset({
+      schoolName: user.schoolName,
+      schoolEmail: user.schoolEmail,
+      contactNumber: user.contactNumber,
+      schoolLogo: null,
+    });
+    setPreview(user.schoolLogo);
     setOpenUpdate(true);
   };
 
   const handleDelete = (user: User) => {
     setSelectedUser(user);
     setOpenDelete(true);
+  };
+
+  const onUpdateSubmit = (data: FormValues) => {
+    console.log("Updated data:", data);
+    setOpenUpdate(false);
+    setPreview(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setPreview(URL.createObjectURL(e.target.files[0]));
+    }
   };
 
   return (
@@ -103,7 +135,7 @@ export default function SchoolTable() {
         </Button>
       </div>
 
-      {/* Table wrapper for responsive scroll */}
+      {/* Table */}
       <div className="overflow-x-auto">
         <Table className="min-w-[700px]">
           <TableHeader>
@@ -210,18 +242,74 @@ export default function SchoolTable() {
           <DialogHeader>
             <DialogTitle>Update School</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <p>
-              Update info for: <strong>{selectedUser?.schoolName}</strong>
-            </p>
-            {/* Add form inputs here */}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenUpdate(false)}>
-              Cancel
-            </Button>
-            <Button>Save</Button>
-          </DialogFooter>
+
+          <form onSubmit={handleSubmit(onUpdateSubmit)} className="space-y-4">
+            {/* School Name */}
+            <div className="flex flex-col space-y-4 ">
+              <Label htmlFor="schoolName">School Name</Label>
+              <Input
+                id="schoolName"
+                {...register("schoolName", { required: "School name is required" })}
+              />
+              {errors.schoolName && (
+                <p className="text-red-500 text-sm">{errors.schoolName.message}</p>
+              )}
+            </div>
+
+            {/* School Email */}
+            <div className="flex flex-col space-y-4 ">
+              <Label htmlFor="schoolEmail">School Email</Label>
+              <Input
+                id="schoolEmail"
+                type="email"
+                {...register("schoolEmail", { required: "Email is required" })}
+              />
+              {errors.schoolEmail && (
+                <p className="text-red-500 text-sm">{errors.schoolEmail.message}</p>
+              )}
+            </div>
+
+            {/* Contact Number */}
+            <div className="flex flex-col space-y-4 ">
+              <Label htmlFor="contactNumber">Contact Number</Label>
+              <Input
+                id="contactNumber"
+                {...register("contactNumber", { required: "Contact number is required" })}
+              />
+              {errors.contactNumber && (
+                <p className="text-red-500 text-sm">{errors.contactNumber.message}</p>
+              )}
+            </div>
+
+            {/* School Logo */}
+            <div className="flex flex-col space-y-4 ">
+              <Label htmlFor="schoolLogo">School Logo</Label>
+              <Controller
+                control={control}
+                name="schoolLogo"
+                render={({ field }) => (
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      field.onChange(e.target.files);
+                      handleFileChange(e);
+                    }}
+                  />
+                )}
+              />
+              {preview && (
+                <div className="mt-2 w-24 h-24 relative border rounded overflow-hidden">
+                  <Image src={preview} alt="School Logo" fill style={{ objectFit: "cover" }} />
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="space-x-2">
+              <Button variant="outline" onClick={() => setOpenUpdate(false)}>Cancel</Button>
+              <Button type="submit">Save</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -249,13 +337,7 @@ export default function SchoolTable() {
       {/* Add School Modal */}
       <Dialog open={openAdminModal} onOpenChange={setOpenAdminModal}>
         <DialogContent>
-          <DialogHeader>
-            {/* <DialogTitle>Add School</DialogTitle> */}
-          </DialogHeader>
-          <div className="space-y-2">
-            <SchoolFormUpload/>
-          </div>
-          
+          <SchoolFormUpload/>
         </DialogContent>
       </Dialog>
     </div>
