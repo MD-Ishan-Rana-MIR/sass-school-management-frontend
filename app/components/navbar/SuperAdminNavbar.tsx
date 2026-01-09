@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, Bell, Settings, LogOut } from "lucide-react";
+import { Menu, Bell, Settings, LogOut, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -154,6 +154,14 @@ export default function SuperAdminNavbar({
               onClick={() => setDropdownOpen(false)}
             >
               <Settings className="w-4 h-4" /> Settings
+            </Link>
+
+            <Link
+              href="/super-admin/profile"
+              className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
+              onClick={() => setDropdownOpen(false)}
+            >
+              <User className="w-4 h-4" /> Profile
             </Link>
 
             <button
