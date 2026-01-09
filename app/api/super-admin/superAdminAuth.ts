@@ -24,6 +24,22 @@ export const authApi = baseApi.injectEndpoints({
             }),
             invalidatesTags: ["Auth"],
         }),
+        superAdminProfileUpdate : builder.mutation({
+            query : (values) =>({
+                url : `/super-admin-profile-update`,
+                method : "PUT",
+                body : values
+            }),
+            invalidatesTags : ["Auth"]
+        }),
+        superAdminProfileImageUpdate : builder.mutation({
+            query : (formData)=>({
+                url : `/super-admin-img-update`,
+                method : "PUT",
+                body : formData
+            }),
+            invalidatesTags:["Auth"]
+        })
 
     }),
 })
@@ -32,4 +48,6 @@ export const {
     useLoginMutation,
     useProfileQuery,
     useLogoutMutation,
+    useSuperAdminProfileUpdateMutation,
+    useSuperAdminProfileImageUpdateMutation
 } = authApi

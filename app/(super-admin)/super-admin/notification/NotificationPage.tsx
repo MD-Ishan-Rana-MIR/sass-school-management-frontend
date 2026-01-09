@@ -66,8 +66,8 @@ export default function NotificationsPage() {
             if(res.isConfirmed){
                 const res = await readAllNotification({}).unwrap();
                 if(res){
-
-                                    toast.success(res?.message)
+                  refetch()
+                    toast.success(res?.message)
                 }
 
             }
