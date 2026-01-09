@@ -14,6 +14,7 @@ import {
   Settings,
   X,
   School,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
@@ -51,6 +52,12 @@ export default function SuperAdminSidebar({
       icon: <Settings className="w-4 h-4" />,
       link: "/super-admin/settings",
     },
+    {
+      label: "Notification",
+      icon: <Bell className="w-4 h-4" />,
+      link: "/super-admin/notification",
+    },
+    
   ];
 
   return (

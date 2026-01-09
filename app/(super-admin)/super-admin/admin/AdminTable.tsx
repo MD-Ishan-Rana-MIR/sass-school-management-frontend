@@ -192,11 +192,10 @@ export default function AdminTable() {
 
             <Dialog open={openAdminModal} onOpenChange={setOpenAdminModal}>
                 <DialogContent className="  " >
-                    <AdminUploadFrom />
-                    {/* <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpenDelete(false)}>Cancel</Button>
-                        <Button variant="destructive">Delete</Button>
-                    </DialogFooter> */}
+                    <div className="h-screen  overflow-auto " >
+                        <AdminUploadFrom />
+                    </div>
+                    
                 </DialogContent>
             </Dialog>
 
