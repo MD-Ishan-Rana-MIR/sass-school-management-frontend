@@ -24,13 +24,15 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-import { useAllSchoolQuery, useDeleteSchoolMutation, useSchoolUpdateMutation } from "@/app/api/super-admin/schoolApi";
+import { useAllSchoolQuery, useDeleteSchoolMutation, useSchoolStatusUpdateMutation, useSchoolUpdateMutation } from "@/app/api/super-admin/schoolApi";
 import { TableSkeleton } from "@/app/components/skeleton/TableSkeleton";
 import SchoolFormUpload from "./SchoolFormUpload";
 import { imgUrl } from "@/app/utility/img/imgUrl";
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { updateAlert } from "@/app/utility/alert/updateAlert";
+import { statusUpdateAlert } from "@/app/utility/alert/statusUpdateAlert";
+import { deleteAlert } from "@/app/utility/alert/deleteAlert";
 
 /* ---------------- TYPES ---------------- */
 
@@ -42,7 +44,7 @@ interface User {
   contactNumber: string;
   schoolId: string;
   createdAt: string;
-  isActive: boolean;
+  status: boolean;
 }
 
 type FormValues = {
@@ -122,12 +124,22 @@ export default function SchoolTable() {
 
   const handleDelete = async (user: User) => {
     try {
-      const res = await deleteSchool(user?._id).unwrap();
+      const res = await deleteAlert();
+      if(res.isConfirmed){
+        const res = await deleteSchool(user?._id).unwrap();
       if (res) {
-        console.log(res)
         toast.success("delete successfully")
       }
-    } catch (error) {
+      }
+    } catch (err) {
+      const error = err as FetchBaseQueryError & {
+        data?: { message?: string };
+      };
+
+      const message =
+        error.data?.message || "Something went wrong ❌";
+
+      toast.error(message);
 
     }
 
@@ -142,6 +154,33 @@ export default function SchoolTable() {
   };
 
   const [schoolUpdate, { isLoading: updateLoading }] = useSchoolUpdateMutation();
+  const [schoolStatusUpdate] = useSchoolStatusUpdateMutation()
+  // status update 
+  const handleStatusUpdate = async (id:number)=>{
+    try {
+      
+      const res = await statusUpdateAlert();
+      if(res.isConfirmed){
+        const res = await schoolStatusUpdate(id).unwrap();
+        if(res){
+          toast.success(res?.message);
+        }
+      }
+
+    } catch (err) {
+      const error = err as FetchBaseQueryError & {
+        data?: { message?: string };
+      };
+
+      const message =
+        error.data?.message || "Something went wrong ❌";
+
+      toast.error(message);
+      
+    }
+  }
+
+  // school update 
 
   const onUpdateSubmit = async (data: FormValues) => {
     try {
@@ -206,7 +245,6 @@ export default function SchoolTable() {
         />
         <Button
           size="sm"
-          variant="destructive"
           onClick={() => setOpenAdminModal(true)}
         >
           Add School
@@ -230,7 +268,7 @@ export default function SchoolTable() {
 
           <TableBody>
             {paginatedData.map((user) => (
-              <TableRow key={user.id}>
+              <TableRow key={user._id}>
                 <TableCell>{user.schoolId}</TableCell>
 
                 <TableCell className="flex items-center gap-2">
@@ -262,22 +300,27 @@ export default function SchoolTable() {
 
                 <TableCell>
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${user.isActive
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${user.status
                       ? "bg-green-100 text-green-700"
                       : "bg-red-100 text-red-700"
                       }`}
                   >
-                    {user.isActive ? "Active" : "Inactive"}
+                    {user.status ? "Active" : "Inactive"}
                   </span>
                 </TableCell>
 
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleUpdate(user)}>
+                    <Button size="sm"  onClick={() => handleUpdate(user)}>
                       Update
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleDelete(user)}>
+                    <Button size="sm" onClick={() => handleDelete(user)}>
                       Delete
+                    </Button>
+                    <Button size="sm" onClick={() => handleStatusUpdate(user?._id)}>
+                      {
+                        user.status ? "Inactive" : "Active"
+                      }
                     </Button>
                   </div>
                 </TableCell>
@@ -367,7 +410,7 @@ export default function SchoolTable() {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => {
+              <Button  onClick={() => {
                 setOpenUpdate(false);
                 setPreview(null);
               }}>
