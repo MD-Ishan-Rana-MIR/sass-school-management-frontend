@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
-
+import { useCreateSchoolMutation } from "@/app/api/super-admin/schoolApi";
+import { Spinner } from "@/components/ui/spinner"
 type FormValues = {
   schoolName: string;
   schoolEmail: string;
@@ -18,11 +19,29 @@ export default function SchoolFormUpload() {
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<FormValues>();
   const [preview, setPreview] = useState<string | null>(null);
 
-  const onSubmit = (data: FormValues) => {
-    console.log("Form submitted:", data);
-    // reset form
-    reset();
-    setPreview(null);
+  const [createSchool, { isLoading }] = useCreateSchoolMutation();
+
+  const onSubmit = async (data: FormValues) => {
+    try {
+      // Create FormData
+      const formData = new FormData();
+      formData.append("schoolName", data.schoolName);
+      formData.append("schoolEmail", data.schoolEmail);
+      formData.append("contactNumber", data.contactNumber);
+
+      if (data.schoolLogo && data.schoolLogo[0]) {
+        formData.append("schoolLogo", data.schoolLogo[0]); // append the first file
+      }
+
+      const res = await createSchool(formData).unwrap();
+      console.log(res);
+
+      // reset form
+      reset();
+      setPreview(null);
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,7 +121,11 @@ export default function SchoolFormUpload() {
 
       {/* Submit Button */}
       <Button type="submit" className="mt-2 w-full">
-        Save School
+        {
+          isLoading ? <Spinner /> :
+            <>Save School</>
+
+        }
       </Button>
     </form>
   );

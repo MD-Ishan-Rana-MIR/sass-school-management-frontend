@@ -114,7 +114,7 @@ export default function AdminTable() {
                                 <Button size="sm" variant="outline" onClick={() => handleUpdate(user)}>
                                     Update
                                 </Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleDelete(user)}>
+                                <Button size="sm" onClick={() => handleDelete(user)}>
                                     Delete
                                 </Button>
                             </TableCell>

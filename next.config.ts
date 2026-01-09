@@ -2,7 +2,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ["via.placeholder.com"], // <-- Add this
+    domains: ["via.placeholder.com", "localhost"], // <-- Add this
   },
 };
 

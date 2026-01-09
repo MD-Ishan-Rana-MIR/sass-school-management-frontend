@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
+import { useForm, Controller } from "react-hook-form";
+
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,13 +22,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import Image from "next/image";
-import { useForm, Controller } from "react-hook-form";
-import SchoolFormUpload from "./SchoolFormUpload";
 import { Label } from "@/components/ui/label";
 
+import { useAllSchoolQuery, useDeleteSchoolMutation, useSchoolUpdateMutation } from "@/app/api/super-admin/schoolApi";
+import { TableSkeleton } from "@/app/components/skeleton/TableSkeleton";
+import SchoolFormUpload from "./SchoolFormUpload";
+import { imgUrl } from "@/app/utility/img/imgUrl";
+import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import { toast } from "sonner";
+import { updateAlert } from "@/app/utility/alert/updateAlert";
+
+/* ---------------- TYPES ---------------- */
+
 interface User {
-  id: number;
+  _id: number;
   schoolName: string;
   schoolLogo: string;
   schoolEmail: string;
@@ -34,17 +45,6 @@ interface User {
   isActive: boolean;
 }
 
-const dummyData: User[] = Array.from({ length: 42 }, (_, i) => ({
-  id: i + 1,
-  schoolName: `School ${i + 1}`,
-  schoolLogo: "https://via.placeholder.com/40",
-  schoolEmail: `school${i + 1}@example.com`,
-  contactNumber: `017XXXXXXXX`,
-  schoolId: `SCH-${1000 + i}`,
-  createdAt: new Date().toISOString().split("T")[0],
-  isActive: i % 2 === 0,
-}));
-
 type FormValues = {
   schoolName: string;
   schoolEmail: string;
@@ -52,66 +52,144 @@ type FormValues = {
   schoolLogo: FileList | null;
 };
 
+/* ---------------- COMPONENT ---------------- */
+
 export default function SchoolTable() {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
+  const pageSize = 10;
+
   const [openUpdate, setOpenUpdate] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
   const [openAdminModal, setOpenAdminModal] = useState(false);
+
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  // React Hook Form for Update
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<FormValues>();
+  const { data, isLoading } = useAllSchoolQuery({});
+  const schools: User[] = data?.data?.schools || [];
 
-  // Filtered data
-  const filteredData = useMemo(
-    () =>
-      dummyData.filter(
-        (user) =>
-          user.schoolName.toLowerCase().includes(search.toLowerCase()) ||
-          user.schoolEmail.toLowerCase().includes(search.toLowerCase()) ||
-          user.contactNumber.toLowerCase().includes(search.toLowerCase())
-      ),
-    [search]
-  );
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors },
+  } = useForm<FormValues>();
 
-  // Pagination
+  /* ---------------- FILTER ---------------- */
+
+  const filteredData = useMemo(() => {
+    return schools.filter(
+      (user) =>
+        user.schoolName.toLowerCase().includes(search.toLowerCase()) ||
+        user.schoolEmail.toLowerCase().includes(search.toLowerCase()) ||
+        user.contactNumber.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [search, schools]);
+
+  /* ---------------- PAGINATION ---------------- */
+
   const totalPages = Math.ceil(filteredData.length / pageSize);
+
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredData.slice(start, start + pageSize);
-  }, [currentPage, filteredData, pageSize]);
+  }, [currentPage, filteredData]);
+
+  /* ---------------- HANDLERS ---------------- */
+
+  const [id, setId] = useState<number | undefined>();
 
   const handleUpdate = (user: User) => {
+    console.log(user)
+    setId(user?._id)
     setSelectedUser(user);
+
     reset({
       schoolName: user.schoolName,
       schoolEmail: user.schoolEmail,
       contactNumber: user.contactNumber,
       schoolLogo: null,
     });
-    setPreview(user.schoolLogo);
+
+    // ✅ DB image preview
+    setPreview(user.schoolLogo ? `${imgUrl}${user.schoolLogo}` : null);
     setOpenUpdate(true);
   };
 
-  const handleDelete = (user: User) => {
-    setSelectedUser(user);
-    setOpenDelete(true);
-  };
+  const [deleteSchool] = useDeleteSchoolMutation();
 
-  const onUpdateSubmit = (data: FormValues) => {
-    console.log("Updated data:", data);
-    setOpenUpdate(false);
-    setPreview(null);
+  const handleDelete = async (user: User) => {
+    try {
+      const res = await deleteSchool(user?._id).unwrap();
+      if (res) {
+        console.log(res)
+        toast.success("delete successfully")
+      }
+    } catch (error) {
+
+    }
+
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setPreview(URL.createObjectURL(e.target.files[0]));
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // ✅ New upload preview
+    setPreview(URL.createObjectURL(file));
+  };
+
+  const [schoolUpdate, { isLoading: updateLoading }] = useSchoolUpdateMutation();
+
+  const onUpdateSubmit = async (data: FormValues) => {
+    try {
+      const formData = new FormData();
+
+      formData.append("schoolName", data.schoolName);
+      formData.append("schoolEmail", data.schoolEmail);
+      formData.append("contactNumber", data.contactNumber);
+
+      if (data.schoolLogo?.[0]) {
+        formData.append("schoolLogo", data.schoolLogo[0]);
+      }
+
+      // 🔔 confirmation alert
+      // ✅ RTK Query mutation (IMPORTANT FIX)
+      const res = await schoolUpdate({
+        formData,
+        id
+      }).unwrap();
+
+
+
+      toast.success("School updated successfully ✅");
+      console.log(res);
+
+      // ✅ close modal AFTER success
+      setOpenUpdate(false);
+      setPreview(null);
+
+    } catch (err) {
+      const error = err as FetchBaseQueryError & {
+        data?: { message?: string };
+      };
+
+      const message =
+        error.data?.message || "Something went wrong ❌";
+
+      toast.error(message);
     }
   };
+
+  /* ---------------- LOADING ---------------- */
+
+  if (isLoading) {
+    return <TableSkeleton />;
+  }
+
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="p-4 sm:p-6 bg-white rounded-2xl shadow space-y-4">
@@ -129,7 +207,7 @@ export default function SchoolTable() {
         <Button
           size="sm"
           variant="destructive"
-          onClick={() => setOpenAdminModal(!openAdminModal)}
+          onClick={() => setOpenAdminModal(true)}
         >
           Add School
         </Button>
@@ -154,50 +232,51 @@ export default function SchoolTable() {
             {paginatedData.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.schoolId}</TableCell>
+
                 <TableCell className="flex items-center gap-2">
                   <Image
-                    src={user.schoolLogo}
+                    src={`${imgUrl}${user.schoolLogo}`}
                     alt={user.schoolName}
-                    width={40}
-                    height={40}
-                    className="rounded-full"
+                    width={100}
+                    height={100}
+                    className="rounded-full w-24 h-24 border"
+                    unoptimized
                   />
                   {user.schoolName}
                 </TableCell>
+
                 <TableCell className="hidden md:table-cell">
                   {user.schoolEmail}
                 </TableCell>
+
                 <TableCell className="hidden lg:table-cell">
                   {user.contactNumber}
                 </TableCell>
+
                 <TableCell className="hidden lg:table-cell">
-                  {user.createdAt}
+                  {/* {user.createdAt} */}
+                  {
+                    new Date(user.createdAt).toDateString()
+                  }
                 </TableCell>
+
                 <TableCell>
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      user.isActive
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${user.isActive
+                      ? "bg-green-100 text-green-700"
+                      : "bg-red-100 text-red-700"
+                      }`}
                   >
                     {user.isActive ? "Active" : "Inactive"}
                   </span>
                 </TableCell>
+
                 <TableCell>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleUpdate(user)}
-                    >
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => handleUpdate(user)}>
                       Update
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDelete(user)}
-                    >
+                    <Button size="sm" variant="destructive" onClick={() => handleDelete(user)}>
                       Delete
                     </Button>
                   </div>
@@ -209,14 +288,11 @@ export default function SchoolTable() {
       </div>
 
       {/* Pagination */}
-      <div className="flex justify-center flex-wrap items-center gap-2 mt-4">
-        <Button
-          size="sm"
-          disabled={currentPage === 1}
-          onClick={() => setCurrentPage((prev) => prev - 1)}
-        >
+      <div className="flex justify-center gap-2 mt-4 flex-wrap">
+        <Button size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
           Prev
         </Button>
+
         {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
           <Button
             key={page}
@@ -227,10 +303,11 @@ export default function SchoolTable() {
             {page}
           </Button>
         ))}
+
         <Button
           size="sm"
           disabled={currentPage === totalPages}
-          onClick={() => setCurrentPage((prev) => prev + 1)}
+          onClick={() => setCurrentPage(p => p + 1)}
         >
           Next
         </Button>
@@ -244,46 +321,23 @@ export default function SchoolTable() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit(onUpdateSubmit)} className="space-y-4">
-            {/* School Name */}
-            <div className="flex flex-col space-y-4 ">
-              <Label htmlFor="schoolName">School Name</Label>
-              <Input
-                id="schoolName"
-                {...register("schoolName", { required: "School name is required" })}
-              />
-              {errors.schoolName && (
-                <p className="text-red-500 text-sm">{errors.schoolName.message}</p>
-              )}
+            <div>
+              <Label>School Name</Label>
+              <Input {...register("schoolName", { required: true })} />
             </div>
 
-            {/* School Email */}
-            <div className="flex flex-col space-y-4 ">
-              <Label htmlFor="schoolEmail">School Email</Label>
-              <Input
-                id="schoolEmail"
-                type="email"
-                {...register("schoolEmail", { required: "Email is required" })}
-              />
-              {errors.schoolEmail && (
-                <p className="text-red-500 text-sm">{errors.schoolEmail.message}</p>
-              )}
+            <div>
+              <Label>Email</Label>
+              <Input type="email" {...register("schoolEmail", { required: true })} />
             </div>
 
-            {/* Contact Number */}
-            <div className="flex flex-col space-y-4 ">
-              <Label htmlFor="contactNumber">Contact Number</Label>
-              <Input
-                id="contactNumber"
-                {...register("contactNumber", { required: "Contact number is required" })}
-              />
-              {errors.contactNumber && (
-                <p className="text-red-500 text-sm">{errors.contactNumber.message}</p>
-              )}
+            <div>
+              <Label>Contact</Label>
+              <Input {...register("contactNumber", { required: true })} />
             </div>
 
-            {/* School Logo */}
-            <div className="flex flex-col space-y-4 ">
-              <Label htmlFor="schoolLogo">School Logo</Label>
+            <div>
+              <Label>School Logo</Label>
               <Controller
                 control={control}
                 name="schoolLogo"
@@ -298,16 +352,30 @@ export default function SchoolTable() {
                   />
                 )}
               />
+
               {preview && (
                 <div className="mt-2 w-24 h-24 relative border rounded overflow-hidden">
-                  <Image src={preview} alt="School Logo" fill style={{ objectFit: "cover" }} />
+                  <Image
+                    src={preview}
+                    alt="Preview"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
                 </div>
               )}
             </div>
 
-            <DialogFooter className="space-x-2">
-              <Button variant="outline" onClick={() => setOpenUpdate(false)}>Cancel</Button>
-              <Button type="submit">Save</Button>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setOpenUpdate(false);
+                setPreview(null);
+              }}>
+                Cancel
+              </Button>
+              <Button type="submit">{
+                updateLoading ? "" : "Save"
+              }</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -319,12 +387,10 @@ export default function SchoolTable() {
           <DialogHeader>
             <DialogTitle>Delete School</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <p>
-              Are you sure you want to delete{" "}
-              <strong>{selectedUser?.schoolName}</strong>?
-            </p>
-          </div>
+          <p>
+            Are you sure you want to delete{" "}
+            <strong>{selectedUser?.schoolName}</strong>?
+          </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenDelete(false)}>
               Cancel
@@ -337,7 +403,7 @@ export default function SchoolTable() {
       {/* Add School Modal */}
       <Dialog open={openAdminModal} onOpenChange={setOpenAdminModal}>
         <DialogContent>
-          <SchoolFormUpload/>
+          <SchoolFormUpload />
         </DialogContent>
       </Dialog>
     </div>

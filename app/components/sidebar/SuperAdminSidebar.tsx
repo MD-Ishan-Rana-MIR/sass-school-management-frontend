@@ -112,9 +112,8 @@ export default function SuperAdminSidebar({
                       {item.label}
                     </span>
                     <ChevronDown
-                      className={`w-4 h-4 transition-transform ${
-                        openMenu === item.label ? "rotate-180" : ""
-                      }`}
+                      className={`w-4 h-4 transition-transform ${openMenu === item.label ? "rotate-180" : ""
+                        }`}
                     />
                   </Button>
                 </CollapsibleTrigger>
@@ -125,7 +124,7 @@ export default function SuperAdminSidebar({
                       <Link key={sub.label} href={sub.link}>
                         <Button
                           variant="ghost"
-                          className="w-full justify-start"
+                          className="w-full cursor-pointer justify-start"
                         >
                           {sub.label}
                         </Button>
@@ -138,11 +137,10 @@ export default function SuperAdminSidebar({
               <Link key={item.label} href={item.link!}>
                 <Button
                   variant="ghost"
-                  className={`w-full justify-start gap-2 ${
-                    pathname === item.link
-                      ? "bg-muted font-medium"
-                      : ""
-                  }`}
+                  className={`w-full justify-start gap-2 cursor-pointer  ${pathname === item.link
+                    ? "bg-muted font-medium cursor-pointer "
+                    : ""
+                    }`}
                 >
                   {item.icon}
                   {item.label}

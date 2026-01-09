@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useEffect, useState, useCallback } from "react"
 
 import {
   Form,
@@ -16,7 +17,23 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useLoginMutation } from "./api/super-admin/superAdminAuth"
+import { FetchBaseQueryError } from "@reduxjs/toolkit/query"
+import { toast } from "sonner"
+import { loginAlert } from "./utility/alert/loginAlert"
+import { autoLogoutOnCookieExpiry, setCookie7Days } from "./utility/cookies/cookies"
 
+// --------------------
+// Config
+// --------------------
+const MAX_ATTEMPTS = 3
+const LOCK_TIME = 10 * 60 * 1000 // 10 minutes
+const COOKIE_NAME = "superAdminToken"
+
+
+// --------------------
+// Zod Schema
+// --------------------
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -24,7 +41,25 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>
 
+// --------------------
+// Helper: Set 7-day cookie
+// --------------------
+
+
+// --------------------
+// Helper: Check cookie
+// --------------------
+function getCookie(name: string) {
+  const cookies = document.cookie.split("; ").map((c) => c.split("="))
+  const found = cookies.find(([key]) => key === name)
+  return found ? found[1] : null
+}
+
 export default function LoginPage() {
+  const [login, { isLoading }] = useLoginMutation()
+  const [isLocked, setIsLocked] = useState(false)
+  const [remainingTime, setRemainingTime] = useState<number | null>(null)
+
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -33,38 +68,130 @@ export default function LoginPage() {
     },
   })
 
-  const onSubmit = async (data: LoginFormValues) => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include", // 🔥 VERY IMPORTANT
-          body: JSON.stringify(data),
+  // --------------------
+  // Check lock status
+  // --------------------
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+
+    const startCountdown = () => {
+      const lockUntil = localStorage.getItem("loginLockUntil")
+      if (!lockUntil) return
+
+      const updateTime = () => {
+        const timeLeft = Number(lockUntil) - Date.now()
+
+        if (timeLeft <= 0) {
+          localStorage.removeItem("loginLockUntil")
+          localStorage.removeItem("loginAttempts")
+          setIsLocked(false)
+          setRemainingTime(null)
+          clearInterval(interval)
+        } else {
+          setIsLocked(true)
+          setRemainingTime(timeLeft)
         }
-      );
-
-      if (!res.ok) {
-        throw new Error("Login failed");
       }
 
-      const result = await res.json();
-
-      // Redirect by role
-      if (result.role === "admin" || result.role === "teacher") {
-        window.location.href = "/dashboard/dashboard";
-      } else if (result.role === "student") {
-        window.location.href = "/student/dashboard";
-      } else if (result.role === "parent") {
-        window.location.href = "/parent/dashboard";
-      }
-
-    } catch (err) {
-      console.error(err);
+      updateTime() // run immediately
+      interval = setInterval(updateTime, 1000)
     }
-  };
 
+    startCountdown()
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [])
+
+  // --------------------
+  // Auto redirect if cookie expired
+  // --------------------
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const token = getCookie(COOKIE_NAME)
+      if (!token) {
+        window.location.href = "/"
+      }
+    }, 60 * 1000) // check every minute
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // --------------------
+  // Submit Handler
+  // --------------------
+  const onSubmit = useCallback(async (data: LoginFormValues) => {
+    try {
+      const alertRes = await loginAlert()
+      if (!alertRes.isConfirmed) return
+
+      const res = await login(data).unwrap()
+
+      // --------------------
+      // Only for super-admin
+      // --------------------
+      if (res?.data?.data?.role === "super-admin") {
+        // ✅ Set 7-day cookie
+        setCookie7Days(COOKIE_NAME, res?.data?.data?.token)
+        // ✅ Redirect to dashboard
+        window.location.href = "/super-admin"
+      }
+
+      // reset lock on success
+      localStorage.removeItem("loginAttempts")
+      localStorage.removeItem("loginLockUntil")
+
+      toast.success(res?.data?.message)
+    } catch (err) {
+      const error = err as FetchBaseQueryError & { data?: { message?: string } }
+      const message = error.data?.message || "Invalid email or password ❌"
+      toast.error(message)
+
+      // --------------------
+      // Handle attempts
+      // --------------------
+      const attempts = Number(localStorage.getItem("loginAttempts") || 0) + 1
+      localStorage.setItem("loginAttempts", attempts.toString())
+
+      if (attempts >= MAX_ATTEMPTS) {
+        const lockUntil = Date.now() + LOCK_TIME
+        localStorage.setItem("loginLockUntil", lockUntil.toString())
+        setIsLocked(true)
+        setRemainingTime(LOCK_TIME)
+
+        toast.error("Too many attempts. Try again after 10 minutes ⏳")
+      }
+    }
+  }, [login])
+
+
+  // useEffect(() => {
+  //   // Start auto-logout checks
+  //   const cleanupToken = autoLogoutOnCookieExpiry("token", "/")
+  //   const cleanupAdmin = autoLogoutOnCookieExpiry("superAdminToken", "/")
+
+  //   // Cleanup on unmount
+  //   return () => {
+  //     cleanupToken()
+  //     cleanupAdmin()
+  //   }
+  // }, [])
+
+
+
+  // --------------------
+  // Format remaining time
+  // --------------------
+  const formatTime = (ms: number) => {
+    const minutes = Math.floor(ms / 60000)
+    const seconds = Math.floor((ms % 60000) / 1000)
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`
+  }
+
+  // --------------------
+  // Render
+  // --------------------
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
       <Card className="w-full max-w-md shadow-lg">
@@ -77,7 +204,6 @@ export default function LoginPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-
               {/* Email */}
               <FormField
                 control={form.control}
@@ -86,11 +212,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="example@email.com"
-                        {...field}
-                      />
+                      <Input placeholder="Enter your email" type="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -105,30 +227,24 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        {...field}
-                      />
+                      <Input placeholder="Enter your password" type="password" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {/* Locked Message */}
+              {isLocked && remainingTime && (
+                <p className="text-center text-sm text-red-500">
+                  Too many failed attempts. Try again in <b>{formatTime(remainingTime)}</b>
+                </p>
+              )}
+
               {/* Submit */}
-              <Button type="submit" className="w-full">
-                Login
+              <Button type="submit" className="w-full" disabled={isLoading || isLocked}>
+                {isLocked ? "Locked ⛔" : isLoading ? "Logging in..." : "Login"}
               </Button>
-
-              {/* Extra links */}
-              <div className="text-center text-sm text-gray-500">
-                Don’t have an account?{" "}
-                <span className="cursor-pointer text-primary hover:underline">
-                  Sign up
-                </span>
-              </div>
-
             </form>
           </Form>
         </CardContent>
